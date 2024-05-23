@@ -786,7 +786,7 @@ class Firefly(Enemy):
         # The two sets of five tiles extending in a vertical line from the
         # firefly: (uses FIRE_DIS = 5) (i, 0) changes vertical position.
         return [add_positions(self._position, pos) for pos in 
-                [(i, 0) for i in range(-SCORP_DIS, SCORP_DIS+1) if i !=  0]]             
+                [(i, 0) for i in range(-FIRE_DIS, FIRE_DIS+1) if i !=  0]]             
 
     def get_symbol(self) -> str:
         return FIREFLY_SYMBOL
