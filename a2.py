@@ -952,29 +952,25 @@ class Board(object):
         represents the top-most row of the board, and the last list represents
         the bottom-most row of the board.
         
-        The first character of each inner list represents the left-most tile on
-        that row, and the last character of each inner list represents the
-        right-most tile on that row. 
-        
-        A precondition to this function is that each list (each row) within the
-        given board will have the same length. Another precondition to this 
-        function is that the given array will contain at least one row.
-        
-        The final precondition to this function is that each character provided
-        will be the string representation of one of the tile subclasses
-        described in previous sections.
+        Paramaters:
+            board (list[list[str]]): The array of characters used to instanciate
+                the board. The first character of each inner list represents the
+                left-most tile on that row, and the last character of each inner
+                list represents the right-most tile on that row. 
+
+        Preconditions:
+            - each list (each row) within the given board will have the same
+              length. 
+            - the given array will contain at least one row.
+            - each character provided will be the string representation of one 
+              of the tile subclasses
         """
         self._board = self._generate_initial_board(board)
 
     def __repr__(self) -> str:
-        board_string = [] # Turning board back into repr 
-        for row in self._board:
-            row_str = [] 
-            for tile in row:
-                row_str.append("'" + str(tile) + "'") # adds "T" tile in quotes.
-            board_string.append('[' + ', '.join(row_str) + ']') # adds list
-
-        return f"Board([{', '.join(board_string)}])"
+        """Returns a machine readable string that could be used to construct an
+        identical instance of the board"""
+        return f"Board({[[str(t) for t in row] for row in board]})"
     
     def __str__(self) -> str:
         """Returns a string representation of the board.
@@ -990,9 +986,6 @@ class Board(object):
                 row_str.append(str(tile))
             output.append(''.join(row_str))
         return '\n'.join(output)
-
-    def get_board(self) -> list[list[object]]:
-        return self._board
 
     def _generate_initial_board(self, input_board: list[list[str]]):
         board = []
@@ -1010,7 +1003,11 @@ class Board(object):
                 row_objects.append(obj)
             board.append(row_objects)
         return board
-                
+       
+
+    def get_board(self) -> list[list[object]]:
+        return self._board
+         
     def get_dimensions(self) -> tuple[int, int]:
         return (len(self._board), len(self._board[0]))
     
