@@ -137,9 +137,8 @@ class BreachModel(object):
     def _closest_position(self, positions, start, end, include_start=True):
         closest_pos, least_dist = None, None
         for pos in positions:
-            if end is None:
-                end = pos
-            curr_dist = get_distance(self, start, end)
+            goal = end if end else pos # if no end was included use curr pos.s
+            curr_dist = get_distance(self, start, goal)
             if curr_dist == -1 or (not include_start and not pos == start):
                 # We don't consider this point if either the end point 
                 # is blocking (dist = -1) or if we are not including the 
