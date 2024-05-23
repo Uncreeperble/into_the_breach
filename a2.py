@@ -1041,7 +1041,7 @@ class Board(object):
         buildings = {} # Generating the dictionary by checking every tile
         for row_num, row in enumerate(self._board): # -> go through each tile in
             for col_num, tile in enumerate(row): # the board and ensure
-                if Tile.get_tile_name() == BUILDING_NAME: # it is a building
+                if tile.get_tile_name() == BUILDING_NAME: # it is a building
                     buildings[(row_num, col_num)] = tile # -> add pos : building
         return buildings
     
