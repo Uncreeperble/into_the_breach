@@ -21,6 +21,9 @@ ENEMY_FRIENDLINESS = False # Enemies are NEVER friendly.
 TILE_DEFAULT_BLOCKING = False # Tiles are NOT blocking by default
 MECH_DEFAULT_ACTIVITY = True # Mechs are ALWAYS starting as active
 
+TANK_DIS = 5 # The distance tech Mechs can target horizontally
+
+
 UP, DOWN, LEFT, RIGHT = PLUS_OFFSETS[::-1] # 2D-Direction vectors
 
 
@@ -581,9 +584,10 @@ class Mech(Entity):
 
     def __init__(self, position: tuple[int, int], initial_health: int,
                 speed: int, strength: int) -> None:
+        # Initializes the same as its parent class
         super().__init__(position, initial_health, speed, strength)
+        # Also sets the mechs activity 
         self._active = MECH_DEFAULT_ACTIVITY
-        self._previous_position = position
 
     def is_friendly(self) -> bool:
         return MECH_DEFAULT_FREIDNLINESS
@@ -611,9 +615,9 @@ class TankMech(Mech):
 
     def get_targets(self) -> list[tuple[int, int]]:
         # The two sets of five tiles extending in a horizontal line
-        # this is achieved by adding the (0, i) for i from -5 (left) to 5 right
+        # this is achieved by adding the (0, i) for i from -5 left to 5 right
         return list(map(lambda pos : add_positions(self._position, pos),
-                    [(0, i) for i in range(-5, 6) if i !=  0]))
+                    [(0, i) for i in range(-TANK_DIS, TANK_DIS+1) if i !=  0]))
 
     def get_symbol(self) -> str:
         return TANK_SYMBOL
@@ -629,16 +633,17 @@ class HealMech(Mech):
     """
 
     def attack(self, entity: "Entity") -> None:
-        """Heal Mechs can only 'attack' friendly enemies
-        """
+        # Heal Mechs can only 'attack' friendly enemies
         if entity.is_friendly():
             entity.damage(self.get_strength())
+
     def get_strength(self) -> int:
         """Returns the negative (int) of the strength of the heal mech.
         
         Since an entities stored strength is its absolute value, heal mechs
         return the negative of this value to indicate healing not damaging
-        the opposite entity."""
+        the opposite entity.
+        """
         return -self._strength
     
     def get_symbol(self) -> str:
@@ -664,13 +669,12 @@ class Enemy(Entity):
 
     def __init__(self, position: tuple[int, int], initial_health: int,
                  speed: int, strength: int) -> None:
-        """All enemies have an objective, which is a position that the entity 
-        wants to move towards. Enemies of any type are never friendly.
-        """
+        # inits Enemy parent class entity as required
         super().__init__(position, initial_health, speed, strength)
-        self._objective = self._position
+        self._objective = self._position # Also store the objective
     
     def get_objective(self) -> tuple[int, int]:
+        """Returns the enemies current objective position."""
         return self._objective
     
     def update_objective(self, entities: list[Entity],
@@ -680,11 +684,17 @@ class Enemy(Entity):
         
         The default behavior (that is, the behavior in the abstract Enemy class)
         is to set the objective of the enemy to the current position of the
-        enemy. 
+        enemy.  If no valid objective exists, then the enemy's objective does
+        not change.
 
-        A precondition to this function is that the given list of entities is 
-        sorted in descending priority order, with the first entity in the list 
-        being the highest priority."""
+        Paramaters:
+            entities (list[Entity]): The current models entities
+            buildings (dict[tuple[int, int], Building]): The buildings ingame
+
+        Preconditions:
+            the given list of entities is sorted in descending priority order,
+            with the first entity in the list being the highest priority.
+        """
         self._objective = self._position
     
     def get_symbol(self) -> str:
@@ -698,26 +708,27 @@ class Enemy(Entity):
         
 class Scorpion(Enemy):
     """Scorpion represents a type of enemy that attacks at a moderate range in
-    all directions, and targets mechs with the highest health.
-    """
+    all directions, and targets mechs with the highest health."""
 
     def update_objective(self, entities: list[Entity], 
                          buildings: dict[tuple[int, int], "Building"]) -> None:
-        """Position of tile containing mech with the greatest health. If two
-        mechs are tied for greatest health, choose position of tile containing
-        the mech with the highest priority. If no valid objective exists, 
-        then the enemy’s objective should not change.
-        """
+        # Position of tile containing mech with the greatest health
+        # If there are multiple take highest priority.
+        
+        # Finding the mech with the highest health/priotiy:
         greatest_health_mech = None
         for entity in entities:
-            if isinstance(entity, Mech): # TODO ISINSTANCE
-                if not greatest_health_mech or \
-                   entity.get_health() > greatest_health_mech.get_health():
-                   # Set this to the new greatest mech, > implies first one is
-                   # kept ie highest priority preferred.
+                if (entity.is_friendly() #  The entity has to be a Mech
+                    and (not greatest_health_mech or # No current Greatest or
+                        # Has greater health since previous has higher priority.
+                         entity.get_health() > greatest_health_mech.get_health()
+                    )):
+                   # Then set this to the new greatest mech
                    greatest_health_mech = entity
-        if greatest_health_mech:
+
+        if greatest_health_mech: # If we found a valid objective, update to this
             self._objective = greatest_health_mech.get_position()
+
     def get_targets(self) -> list[tuple[int, int]]:
         """The four sets of two tiles extending in horizontal and vertical 
         lines from the scorpion: beginning from the tile directly left of the 
@@ -727,12 +738,13 @@ class Scorpion(Enemy):
         from the tile directly below scorpion and extending downwards
         respectively.
         """ 
-        directions = [LEFT, RIGHT, UP, DOWN] # Standard adjacent squares
-        # the tiles 2 units away in each direction
-        extended_directions = [scale_position(dir, 2) for dir in directions]
-        # calculate each of these positions not relative to current positions
-        return [add_positions(self._position, direction)
-                for direction in directions + extended_directions]
+
+        # the tiles n units away in each direction (ie extending 2 left etc.)
+        relative_tiles = [scale_position(dir, dist+1) # extend distance
+                          for dir in [LEFT, RIGHT, UP, DOWN] # cardinal directns
+                          for dist in range(TANK_DIS)] # 0, 1.. TANK_DIS-1
+        # return the positions using their relative tiles
+        return [add_positions(self._position, pos) for pos in relative_tiles]
 
     def get_symbol(self) -> str:
         return SCORPION_SYMBOL
