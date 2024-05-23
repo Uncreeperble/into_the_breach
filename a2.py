@@ -116,6 +116,8 @@ class BreachModel(object):
                 2. is there an alive enemy left
                 3. is there a non-destroyed building left
         """
+        # Get a list (mapping) of bools for eaech entity if its a mech-
+        # this is quicker than filtering them out and allows any/all.
         entity_is_mech = map(lambda x : x.is_friendly(), self.get_entities())
         has_mech, has_enemy = any(entity_is_mech), not all(entity_is_mech)
         has_building = any(map(lambda x : not x.is_destroyed(),
@@ -123,19 +125,57 @@ class BreachModel(object):
         return (has_mech, has_enemy, has_building)
 
     def _get_enemies(self) -> list['Entity']:
-        """Gets the model's alive enemies in descending priority."""
+        """Gets the model's alive enemies.
+        
+        Returns:
+            list[Entity]: a list of enemies currently in the game, in
+                descending order.
+        """
+        # get_entities already filters out dead entities, this filters mechs out
         return filter(lambda e: not e.is_friendly(), self.get_entities())
 
+    def _closest_position(self, positions, start, end, include_start=True):
+        closest_pos, least_dist = None, None
+        for pos in positions:
+            if end is None:
+                end = pos
+            curr_dist = get_distance(self, start, end)
+            if curr_dist == -1 or (not include_start and not pos == start):
+                # We don't consider this point if either the end point 
+                # is blocking (dist = -1) or if we are not including the 
+                # start but the pos equals the start
+                continue
+            if not closest_pos or curr_dist < least_dist:
+                # If we havn't found a valid point yet or we found a point
+                # that was closer- set this to the new closest
+                closest_pos, least_dist = pos, curr_dist
+        # Ensure we return a valid position (start) if no points were found
+        return closest_pos if closest_pos else start
+
     def get_board(self) -> 'Board':
-        """Gets the model's current Board."""
+        """Gets the model's current Board.
+        
+        Returns:
+            Board: the board object the model is operating with."""
         return self._board  
     
     def ready_to_save(self) -> bool:
-        """Gets the models _can_save state."""
+        """Gets the models _can_save state (bool)."""
         return self._can_save
-
+        
     def get_entities(self) -> list['Entity']:
-        """Gets the model's alive entities in descending priority."""
+        """Gets the model's alive entities.
+        
+        These are the entities that can affect any part of the game - as
+        entities that are not alived are not in gameplay. These entities remain
+        stored however in the private _entities to allow for possible future
+        development of revival etc.
+
+        Returns:
+            list[Entity]: a list of enemies currently in the game, in
+                descending order.
+        """
+        # all it does is filter out ensuring every entitiy is_alive.
         return list(filter(lambda x : x.is_alive(), self._entities))
         
     def entity_positions(self) -> dict[tuple[int, int], 'Entity']:
@@ -148,6 +188,7 @@ class BreachModel(object):
             >>> model.entity_positions()
             {(1, 2): TankMech((1, 2), 3, 3, 3)}
         """
+        # constructs a dictionary for their position : entity 
         return {e.get_position() : e for e in self.get_entities()}
 
     def has_won(self) -> bool:
@@ -157,6 +198,9 @@ class BreachModel(object):
             - all enemies are destroyed,
             - and at least one mech is not destroyed
             - and at least one building on the board is not destroyed.
+
+        Returns:
+            bool: True iff the model has won.
         """
         has_mech, has_enemy, has_building = self._get_win_conditions()
         return not has_enemy and has_mech and has_building
@@ -167,6 +211,9 @@ class BreachModel(object):
         Lose conditions are:
             - all buildings are destroyed,
             - or all mechs are destroyed
+        
+        Returns:
+            bool: True iff the model has lost.
         """
         has_mech, _, has_building = self._get_win_conditions()
         return not has_building or not has_mech
@@ -190,7 +237,7 @@ class BreachModel(object):
             list[tuple[int, int]]: a list of all valid (row, col) positions that
                 the entity is permitted to move to. 
             
-            The list should be ordered such that positions in higher rows appear
+            The list is ordered such that positions in higher rows appear
             before positions in lower rows and positions in columns further left
             appear before positions in columns further right. 
 
@@ -205,11 +252,11 @@ class BreachModel(object):
                 if 0 < get_distance(self, pos, (y, x)) <= speed]
 
     def attempt_move(self, entity: 'Entity', position: tuple[int, int]) -> None:
-        """Attempts to move the entity to the position. 
+        """Attempts to move the entity to the given position. 
         
         Moves the given entity to the specified position only if the entity 
         is friendly, active, and can move to that position according to the game
-        rules present in specification section 3.
+        rules present in specification section 3 (aka get_valid_movement_pos').
         
         Disables entity if a successful move is made, otherwise does nothing.
 
@@ -219,8 +266,10 @@ class BreachModel(object):
         """
         if (entity.is_friendly() and entity.is_active()
             and position in self.get_valid_movement_positions(entity)):
-            entity.set_position(position), entity.disable()
-            self._can_save = False # Since a move has been made
+            # Conditions are met go ahead and set its position, and disable it
+            entity.set_position(position)
+            entity.disable()
+            self._can_save = False # A move has made and end_turn hasn't ran
     
     def make_attack(self, entity: 'Entity') -> None:
         """Makes given entity perform an attack against every tile that is
@@ -237,16 +286,25 @@ class BreachModel(object):
         target_coords = filter(lambda p: 0 <= p[0] < rows and 0 <= p[1] < cols,
                                entity.get_targets()) # filters only valid coords
         for coord in target_coords:
-            if coord in entities: # have to attack entities and damage tiles
+            # Either attack if its an entity or damage if its a building tile
+            if coord in entities:
                 entity.attack(entities[coord])
-            target = self._board.get_tile(coord) # grab the tile object to dmge
+                continue
+            # Damage tile if its a building 
+            target = self._board.get_tile(coord)
             if target.get_tile_name() == BUILDING_NAME:
                 target.damage(entity.get_strength())
             
     def assign_objectives(self) -> None:
-        """Updates the objectives of all enemies based on the current state."""
+        """Updates the objectives of all enemies based on the current state.
+        
+        This method works by running the`Enemy.update_objective method on each
+        enemy with the current game buildings and entities.
+        """
         buildings = self._board.get_buildings()
         entities, enemies = self.get_entities(), self._get_enemies()
+        # Calls it on each enemy- uses list comprehension over mapping to ensure
+        # the calls are ran when the method is.
         [enemy.update_objective(entities, buildings) for enemy in enemies]
                 
     def move_enemies(self) -> None:
@@ -269,28 +327,25 @@ class BreachModel(object):
         for enemy in self._get_enemies():
             objective, enemy_pos = enemy.get_objective(), enemy.get_position()
 
-            # Finding which adjacent open square to the objective is closest.
-            closest_adjacent, dist_to_closest = None, None
-            for adjacent_direction in [DOWN, RIGHT, LEFT, UP]: # Priority order
-                curr_pos = add_positions(objective, adjacent_direction)
-                curr_dist = get_distance(self, enemy_pos, curr_pos)
-                if (curr_dist > 0 and # > 0: doesnt include the curr = enemy pos
-                   (not closest_adjacent or curr_dist < dist_to_closest)):
-                   closest_adjacent, dist_to_closest = curr_pos, curr_dist
-            if not closest_adjacent:
-                continue # The enemies objective was surrounded/unreachable.
-            objective = closest_adjacent # The new goal is getting to this coord
+            if self._board.get_tile(objective).is_blocking():
+                # If the objective is blocking (which it always will be for the
+                # current impementation of the game)
+                # Then find the closest adjacent point to the objective, and try
+                # to get to this point.
+                objective = self._closest_position(
+                    map(add_positions(objective, dir), [DOWN, RIGHT, LEFT, UP]),
+                    enemy_pos,
+                    None, # Don't use a set objective, use the given positions
+                    include_start = False) # We shouldn't consider enemy_pos
+            if not objective:
+                continue # This enemies objective was surrounded/unreachable
 
-            # Finding which valid movement position is closest to this new obj.
-            closest_pos, least_dist = None, None
-            for curr_pos in self.get_valid_movement_positions(enemy):
-                curr_dist = get_distance(self, curr_pos, objective)
-                if (curr_dist >= 0 and
-                    (not closest_pos or curr_dist <= least_dist)):
-                    closest_pos, least_dist = curr_pos, curr_dist
-            # If speed = 0 enemies existed this could be None.
-            if closest_pos:
-                enemy.set_position(closest_pos)
+            # Gets the closest valid position to the objective (including curnt)
+            closest_to_objective = self._closest_position(
+                self.get_valid_movement_positions(enemy), enemy_pos, objective)
+
+            # move the enemy to the closest position to the objective
+            enemy.set_position(closest_to_objective)
                                
     def end_turn(self) -> None:
         """Executes the attack and enemy movement phases.
