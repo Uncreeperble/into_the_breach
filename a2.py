@@ -333,7 +333,8 @@ class BreachModel(object):
                 # Then find the closest adjacent point to the objective, and try
                 # to get to this point.
                 objective = self._closest_position(
-                    map(add_positions(objective, dir), [DOWN, RIGHT, LEFT, UP]),
+                    map(lambda p : add_positions(objective, p),
+                        [DOWN, RIGHT, LEFT, UP]), # list of adjacent positions
                     enemy_pos,
                     None, # Don't use a set objective, use the given positions
                     include_start = False) # We shouldn't consider enemy_pos
