@@ -1,0 +1,15 @@
+        """Short desc.
+
+        Parameters:
+            var (type): desc
+
+        Return:
+            type: desc
+
+        Preconditions:
+            - p1
+
+        Examples:
+            >>> example
+            output
+        """
