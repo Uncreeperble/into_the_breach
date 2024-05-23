@@ -132,10 +132,38 @@ class BreachModel(object):
                 descending order.
         """
         # get_entities already filters out dead entities, this filters mechs out
-        return filter(lambda e: not e.is_friendly(), self.get_entities())
+        return [e for e in self.get_entities() if not e.is_friendly()]
 
-    def _closest_position(self, positions, goal, exclude_goal = False):
-        """TODO : REEMEBER DECENDING ORDER"""
+    def _closest_position(self, positions: list[tuple[int, int]],
+                          goal: tuple[int, int], exclude_goal: bool = False):
+        """Returns the closest position in the given list to  the given goal.
+        
+        This function will iterate the positions list keeping track of which
+        position has the least taxicab distance, via get_distance, to the goal.
+        It will navigate around the current board state.
+
+        If two positions are tied for distance- it will return that of the
+        highest priority (larger row, larger column).
+        
+        Arguments:
+            positions (list[tuple[int, int]]): The list of possible positions to
+                consider.
+            goal (tuple[int, int]): The position of the goal to compare- can
+                contain entities/blocking tiles since get_distance(goal, pos) is
+                used.
+            exclude_goal (bool: default False): If True, the position of the
+                provided goal will not be considered even if its in the provided
+                positions list.
+        
+        Preconditions:
+            The provided positions list is in ascending priority order- that is
+            in order of increasing row then increasing column.
+        
+        Example:
+            >>> model._closest_position([(0, 1), (3, 5), (3, 6), (3, 7)], 
+                                        (3, 6), True)
+            (3, 7)
+        """
         closest_pos, least_dist = None, None
         for pos in positions:
             if pos == goal and exclude_goal:
@@ -175,7 +203,7 @@ class BreachModel(object):
                 descending order.
         """
         # all it does is filter out ensuring every entitiy is_alive.
-        return list(filter(lambda x : x.is_alive(), self._entities))
+        return [e for e in self._entities if e.is_alive()]
         
     def entity_positions(self) -> dict[tuple[int, int], 'Entity']:
         """Gets a dictionary of entities and their positions.
@@ -255,7 +283,7 @@ class BreachModel(object):
         
         Moves the given entity to the specified position only if the entity 
         is friendly, active, and can move to that position according to the game
-        rules present in specification section 3 (aka get_valid_movement_pos').
+        rules present in specification section 3 (aka get_valid_movement_pos).
         
         Disables entity if a successful move is made, otherwise does nothing.
 
@@ -281,13 +309,15 @@ class BreachModel(object):
             entity (Entity): the entity that is attacking.
         """
         rows, cols = self._board.get_dimensions()
+        is_valid_coord = lambda p: 0 <= p[0] < rows and 0 <= p[1] < cols
         entities = self.entity_positions()
-        target_coords = filter(lambda p: 0 <= p[0] < rows and 0 <= p[1] < cols,
-                               entity.get_targets()) # filters only valid coords
-        for coord in target_coords:
+        for coord in entity.get_targets():
+            if not is_valid_coord(coord):
+                continue # don't consider any coords out of range
+
             # Either attack if its an entity or damage if its a building tile
             if coord in entities:
-                entity.attack(entities[coord])
+                entity.attack(entities[coord]) 
                 continue
             # Damage tile if its a building 
             target = self._board.get_tile(coord)
@@ -297,13 +327,11 @@ class BreachModel(object):
     def assign_objectives(self) -> None:
         """Updates the objectives of all enemies based on the current state.
         
-        This method works by running the`Enemy.update_objective method on each
+        This method works by running the Enemy.update_objective method on each
         enemy with the current game buildings and entities.
         """
         buildings = self._board.get_buildings()
         entities, enemies = self.get_entities(), self._get_enemies()
-        # Calls it on each enemy- uses list comprehension over mapping to ensure
-        # the calls are ran when the method is.
         [enemy.update_objective(entities, buildings) for enemy in enemies]
                 
     def move_enemies(self) -> None:
@@ -323,8 +351,7 @@ class BreachModel(object):
         Enemies move in descending priority order starting with the highest
         priority enemy.
         """
-        # TODO
-        for enemy in self._get_enemies():
+        for enemy in self._get_enemies(): # get_enemies is in high->low order
             objective = enemy.get_objective()
 
             # Since the objective is always going to be blocking in the current
@@ -355,9 +382,18 @@ class BreachModel(object):
         objective, and then moves to a new tile on the grid such that they are
         closer to their objective.
         """
+        # 1. ATTACKING PHASE: Every entity Attacks
+        # We need to filter out dead entities as we go to ensure if one attack
+        # kills another entity - that one does not then attack.
         [self.make_attack(ent) for ent in self.get_entities() if ent.is_alive()]
+
+        # 2. ENEMY MOVEMENT PHASE
+        # 2.1 Every entity gets its objectives
         self.assign_objectives()
+        # 2.2 Every entity is moved
         self.move_enemies()
+
+        # 3s. Every entity is enabled- and this indicates a model can save again
         [entity.enable() for entity in self._entities if entity.is_friendly()]
         self._can_save = True   
         
@@ -533,8 +569,9 @@ class Entity(object):
             tuple[int, int]: the (row, col) positions that are attacked in no
                 specific order.
         """
-        return list(map(lambda dir : add_positions(self._position, dir),
-                        [UP, DOWN, LEFT, RIGHT]))
+        # get the 4 adjacent tile positions
+        return [add_positions(self._position, direction)
+                for direction in [UP, DOWN, LEFT, RIGHT]]
 
     def attack(self, entity: "Entity") -> None:
         """Applies this entity's effect to the given entity. 
@@ -672,12 +709,12 @@ class Scorpion(Enemy):
         from the tile directly below scorpion and extending downwards
         respectively.
         """ 
-
-        return list(map(lambda pos : add_positions(self._position, pos),
-                    [LEFT, scale_position(LEFT, 2), # tile and its extended tile
-                     RIGHT, scale_position(RIGHT, 2),# TODO CONSTANTn2 
-                     UP, scale_position(UP, 2),
-                     DOWN, scale_position(DOWN, 2)]))
+        directions = [LEFT, RIGHT, UP, DOWN] # Standard adjacent squares
+        # the tiles 2 units away in each direction
+        extended_directions = [scale_position(dir, 2) for dir in directions]
+        # calculate each of these positions not relative to current positions
+        return [add_positions(self._position, dir)
+                for direction in directions + extended_directions]
 
     def get_symbol(self) -> str:
         return SCORPION_SYMBOL
@@ -720,9 +757,10 @@ class Firefly(Enemy):
         firefly: beginning from the tile directly above of the firefly and
         extending upwards, and beginning from the tile directly below the 
         firefly and extending downwards respectively.
-        """
-        return list(map(lambda pos : add_positions(self._position, pos),
-                    [(i, 0) for i in range(-5, 6) if i !=  0])) # 5 up 5 down
+        """ 
+        return [add_positions(self._position, pos) # get actual coords
+                for dir in # relative coordinates from 5 down to 5 up (not 0)
+                    [(i, 0) for i in range(-5, 6) if i !=  0]]
 
     def get_symbol(self) -> str:
         return FIREFLY_SYMBOL
@@ -940,7 +978,8 @@ class BreachView(object):
                                   (4, 1), (SIDEBAR_WIDTH, GRID_SIZE))
 
         self._controlBar = ControlBar(self._root, save_callback,
-                                      load_callback, turn_callback)
+                                      load_callback, turn_callback,
+                                      height=CONTROL_BAR_HEIGHT)
 
     def get_grid(self):
         return self._gameGrid
@@ -968,11 +1007,6 @@ class BreachView(object):
         self._gameGrid.bind_click_callback(click_callback)
         
 class GameGrid(AbstractGrid):
-    def __init__(self, master: Union[tk.Tk, tk.Widget],
-                 dimensions: tuple[int, int], size: tuple[int, int],
-                **kwargs) -> None:
-        super().__init__(master, dimensions, size, **kwargs)
-
     def redraw(self, board: 'Board', entities: list['Entity'],
                highlighted: list[tuple[int, int]] = None,
                movement: bool = False) -> None:
@@ -1027,12 +1061,7 @@ class GameGrid(AbstractGrid):
         self.bind("<Button 1>", click_callback)
         self.bind("<Button 2>", click_callback)
     
-class SideBar(AbstractGrid):
-    def __init__(self, master: Union[tk.Tk, tk.Widget],
-                 dimensions: tuple[int, int], size: tuple[int, int],
-                **kwargs) -> None:
-        super().__init__(master, dimensions, size, **kwargs)
-    
+class SideBar(AbstractGrid): 
     def _annotate_row(self, row: list[str], row_num, font=SIDEBAR_FONT):
         for col_num, col_text in enumerate(row):
             self.annotate_position((row_num, col_num), col_text, font)
@@ -1076,8 +1105,6 @@ class ControlBar(tk.Frame):
 
         # initialize tk.Frame
         super().__init__(master, **kwargs)
-        self.config(height=CONTROL_BAR_HEIGHT)
-
         # add the 3 main buttons
         self._add_btn(SAVE_TEXT, save_callback)
         self._add_btn(LOAD_TEXT, load_callback)
