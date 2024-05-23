@@ -970,7 +970,7 @@ class Board(object):
     def __repr__(self) -> str:
         """Returns a machine readable string that could be used to construct an
         identical instance of the board"""
-        return f"Board({[[str(t) for t in row] for row in board]})"
+        return f"Board({[[str(t) for t in row] for row in self._board]})"
     
     def __str__(self) -> str:
         """Returns a string representation of the board.
