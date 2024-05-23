@@ -495,7 +495,8 @@ class Entity(object):
         return ENTITY_NAME 
 
     def get_position(self) -> tuple[int, int]:
-        """Gets the entities position as tuple[row: int, col: int]."""
+        """Gets the entities position as tuple[row: int, col: int].
+        Note: position are zero-indexed."""
         return self._position
 
     def set_position(self, position: tuple[int, int]) -> None:
@@ -965,7 +966,23 @@ class Board(object):
             - each character provided will be the string representation of one 
               of the tile subclasses
         """
-        self._board = self._generate_initial_board(board)
+        # GENERATING THE INITIAL BOARD FROM CHARACTER LIST
+        # Iterate through the characters given and compare to the implemented
+        # subclasses- make an object of the matching type and add to board
+        # maintaining row / column integrity
+        self._board = []
+        for row in board:
+            row_objects = []
+            for tile_char in row:
+                if tile_char == GROUND_SYMBOL:
+                    obj = Ground()
+                elif tile_char == MOUNTAIN_SYMBOL:
+                    obj = Mountain()
+                else:
+                    # Must be a building with health = int(tile)
+                    obj = Building(int(tile_char))
+                row_objects.append(obj)
+            self._board.append(row_objects)
 
     def __repr__(self) -> str:
         """Returns a machine readable string that could be used to construct an
@@ -978,45 +995,54 @@ class Board(object):
         This is the string formed by concatenating the characters representing
         each tile of a row in the order they appear (left to right), and then
         concatenating each row in order (from top to bottom), separating each
-        row with a new line character."""
+        row with a new line character.
+        """
         return '\n'.join([''.join([str(tile) for tile in row]) # Row of str-tile
                          for row in self._board]) # Each row split by newling
-
-    def _generate_initial_board(self, input_board: list[list[str]]):
-        board = []
-        for row in input_board:
-            row_objects = []
-            for tile in row:
-                obj = None # Current tile object.
-                if tile == GROUND_SYMBOL:
-                    obj = Ground()
-                elif tile == MOUNTAIN_SYMBOL:
-                    obj = Mountain()
-                else:
-                    # Must be a building with health = int(tile)
-                    obj = Building(int(tile))
-                row_objects.append(obj)
-            board.append(row_objects)
-        return board
        
-
-    def get_board(self) -> list[list[object]]:
+    def get_board(self) -> list[list[Tile]]:
+        """Returns the current board as a 2D list of objects/tiles."""
         return self._board
          
     def get_dimensions(self) -> tuple[int, int]:
+        """Returns the (rows, columns) dimensions of the board."""
         return (len(self._board), len(self._board[0]))
     
     def get_tile(self, position: tuple[int, int]) -> Tile:
-        """Precondition not out of bounds we are saying (y, x)"""
-        row, col = position
-        return self._board[row][col]
+        """Gets the Tile at the given position.
+
+        Paramaters:
+            position: the (row, column) position of the tile being fetched-
+                noting that positions are zero-indexed.
+
+        Precondition:
+            the position is not out of bounds of the board dimensions
+        
+        Returns:
+            Tile: the tile at the position
+        """
+        return self._board[position[0]][position[1]]
 
     def get_buildings(self) -> dict[tuple[int, int], Building]:
-        buildings = {}
-        for row_num, row in enumerate(self._board):
-            for col_num, tile in enumerate(row):
-                if isinstance(tile, Building):
-                    buildings[(row_num, col_num)] = tile
+        """Gets a dictionary mapping the positions of buildings to the
+        building instances at those positions.
+        
+        This dictionary only contains positions that have a building tile.
+
+        Returns:
+            dict[tuple[int, int], Building]: The dict in the form pos : building
+
+        Example:
+            >>> board.get_buildings()
+            {(0, 0): Building(5),
+             (2, 2): Building(2)
+            }
+        """
+        buildings = {} # Generating the dictionary by checking every tile
+        for row_num, row in enumerate(self._board): # -> go through each tile in
+            for col_num, tile in enumerate(row): # the board and ensure
+                if Tile.get_tile_name() == BUILDING_NAME: # it is a building
+                    buildings[(row_num, col_num)] = tile # -> add pos : building
         return buildings
     
 
