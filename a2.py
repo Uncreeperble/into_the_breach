@@ -150,7 +150,7 @@ class BreachModel(object):
                 # that was closer- set this to the new closest
                 closest_pos, least_dist = pos, curr_dist
         # Ensure we return a valid position (start) if no points were found
-        return closest_pos if closest_pos else start
+        return closest_pos
 
     def get_board(self) -> 'Board':
         """Gets the model's current Board.
