@@ -23,6 +23,7 @@ MECH_DEFAULT_ACTIVITY = True # Mechs are ALWAYS starting as active
 
 TANK_DIS = 5 # The distance tech Mechs can target horizontally
 SCORP_DIS = 2
+FIRE_DIS = 5
 
 
 UP, DOWN, LEFT, RIGHT = PLUS_OFFSETS[::-1] # 2D-Direction vectors
@@ -76,6 +77,7 @@ def scale_position(position: tuple[int, int], scalar: int):
 #     Controller: links both view and model
 
 # --- MODEL ---
+# ( Main Model Class )
 class BreachModel(object):
     """
     BreachModel controls gameplay including game turns and win checking.
@@ -402,7 +404,8 @@ class BreachModel(object):
         # 3s. Every entity is enabled- and this indicates a model can save again
         [entity.enable() for entity in self._entities if entity.is_friendly()]
         self._can_save = True   
-        
+     
+# ( Entity Classes ) 
 class Entity(object):
     """Entity is an abstract class from which all instantiated types of entity 
     inherit. This class provides default entity behavior, which can be inherited
@@ -617,8 +620,9 @@ class TankMech(Mech):
     def get_targets(self) -> list[tuple[int, int]]:
         # The two sets of five tiles extending in a horizontal line
         # this is achieved by adding the (0, i) for i from -5 left to 5 right
-        return list(map(lambda pos : add_positions(self._position, pos),
-                    [(0, i) for i in range(-TANK_DIS, TANK_DIS+1) if i !=  0]))
+        # to the current position. TANK_DIS = 5
+        return [add_positions(self._position, pos) for pos in 
+                [(0, i) for i in range(-TANK_DIS, TANK_DIS+1) if i !=  0]]
 
     def get_symbol(self) -> str:
         return TANK_SYMBOL
@@ -731,22 +735,13 @@ class Scorpion(Enemy):
             self._objective = greatest_health_mech.get_position()
 
     def get_targets(self) -> list[tuple[int, int]]:
-        """The four sets of two tiles extending in horizontal and vertical 
-        lines from the scorpion: beginning from the tile directly left of the 
-        scorpion and extending left, beginning from the tile directly
-        right of the scorpion and extending right, beginning from the tile
-        directly above of the scorpion and extending upward, and beginning
-        from the tile directly below scorpion and extending downwards
-        respectively.
-        """ 
-
-        # the tiles n units away in each direction (ie extending 2 left etc.)
+        # sets of two tiles extending in horizontal and vertical lines from the
+        # scorpion: eg. beginning from the tile directly left scorpion and 
+        # extending 1 more left. (Up to the distance of SCORP_DIS = 2)
         relative_tiles = [scale_position(dir, dist+1) # extend distance
                           for dist in range(SCORP_DIS) # 0, 1.. SCORP_DIS-1
                           for dir in [LEFT, RIGHT, UP, DOWN]] # cardinal dirs
         # return the positions using their relative tiles
-        print(self)
-        print(relative_tiles)
         return [add_positions(self._position, pos) for pos in relative_tiles]
 
     def get_symbol(self) -> str:
@@ -757,46 +752,41 @@ class Scorpion(Enemy):
 
 class Firefly(Enemy):  
     """Firefly represents a type of enemy that attacks at a long range
-    vertically, and targets buildings with the lowest health
-    """
+    vertically, and targets buildings with the lowest health"""
 
     def update_objective(self, entities: list[Entity], 
                          buildings: dict[tuple[int, int], "Building"]) -> None:
-        """Position of building tile with the least health amongst the buildings
-        that are not destroyed. If two buildings are tied for the least health,
-        choose the position of the building tile in the bottommost row.
-        If there is still a tie for lowest health, choose the position of the
-        building tile in the rightmost column
-        """ 
+        # Position of building tile with the least health amongst the buildings
+        # that are not destroyed - or bottom most right most on tie.
         least_building_pos = None
-        for position, building in buildings.items():
-            if building.is_destroyed():
+        for pos, building in buildings.items(): # Finding the building.
+            if building.is_destroyed(): 
                 continue # don't bother any checks skip to next position
-            if least_building_pos is None:
-                least_building_pos = position
+            if least_building_pos is None: # if we havn't found one use this
+                least_building_pos = pos
                 continue # don't bother checking with itself    
-            least_building = buildings[least_building_pos] # get actual tile
-
+            
+            # Otherwie we need to get the current building and compare to the
+            # current least one
+            least_building = buildings[least_building_pos] 
+            # Either has less health or better position to replace the old best
             if building.get_health() < least_building.get_health():
-                least_building_pos = position
+                least_building_pos = pos
             elif building.get_health() == least_building.get_health():
-                if position[0] > least_building_pos[0]: # bottomer row
-                    least_building_pos = position
-                elif position[0] == least_building_pos[0] and \
-                     position[1] > least_building_pos[1]: # same row, right col.
-                    least_building_pos = position
-        if least_building_pos:
-            self._objective = least_building_pos
+                # Since items() isn't in any order use coord v coord checks
+                if (pos[0] > least_building_pos[0] or # bottomer row or
+                    (pos[0] == least_building_pos[0] and # same row and 
+                     pos[1] > least_building_pos[1])): # more right column
+                    least_building_pos = pos # Better position use this one
+
+        if least_building_pos: # Only do something if we found one not destryoed
+            self._objective = least_building_pos 
 
     def get_targets(self) -> list[tuple[int, int]]:
-        """The two sets of five tiles extending in a vertical line from the
-        firefly: beginning from the tile directly above of the firefly and
-        extending upwards, and beginning from the tile directly below the 
-        firefly and extending downwards respectively.
-        """ 
-        return [add_positions(self._position, dir) # get actual coords
-                for dir in # relative coordinates from 5 down to 5 up (not 0)
-                    [(i, 0) for i in range(-5, 6) if i !=  0]]
+        # The two sets of five tiles extending in a vertical line from the
+        # firefly: (uses FIRE_DIS = 5) (i, 0) changes vertical position.
+        return [add_positions(self._position, pos) for pos in 
+                [(i, 0) for i in range(-SCORP_DIS, SCORP_DIS+1) if i !=  0]]             
 
     def get_symbol(self) -> str:
         return FIREFLY_SYMBOL
@@ -804,21 +794,42 @@ class Firefly(Enemy):
     def get_name(self) -> str:
         return FIREFLY_NAME
 
+# ( Tile Classes )
 class Tile(object):
     """Tiles are used to represent game objects not entities.
     
     Tile is an abstract class from which all instantiated types of tile inherit. 
     Provides default tile behavior, which can be inherited or overridden by 
     specific types of tiles.
+
+    Attributes:
+        _blocking (bool): A tile may be blocking, in which case entities cannot 
+            stand on it. 
+    
+    Methods
     """
 
     def __init__(self) -> None:
+        """Initializes a tile to have its blocking state."""
         self._blocking = TILE_DEFAULT_BLOCKING
+    
+    def __repr__(self) -> str:
+        """Returns a machine readable string that could be used to construct an
+        identical instance of the tile."""
+        # Uses python classs names to ensure integrity- will grab that of the
+        # most specific tile it belongs to.
+        return f"{self.__class__.__name__}()"
+    
+    def __str__(self) -> str:
+        """Returns the character representing this type of tile."""
+        return TILE_SYMBOL
+
+    def get_tile_name(self) -> str:
+        """Returns the name of the type of the tile."""
+        return TILE_NAME
 
     def is_blocking(self) -> bool:
         """Returns True only when the tile is blocking.
-
-        A tile may be blocking, in which case entities cannot stand on it. 
 
         Tiles that are not blocking may have a maximum of one entity standing on
         them at any given time.
@@ -827,29 +838,11 @@ class Tile(object):
         """
         return self._blocking
 
-    def get_tile_name(self) -> str:
-        """Returns the name of the type of the tile."""
-        return TILE_NAME
-
-    def __repr__(self) -> str:
-        """Returns a machine readable string that could be used to construct an
-        identical instance of the tile.
-        """
-        return f"{self.__class__.__name__}()" # TODO depends on subclass name
-    
-    def __str__(self, symbol=TILE_SYMBOL) -> str:
-        """Returns the character representing this type of tile."""
-        return symbol
-
 class Ground(Tile):
     """Ground tiles represent simple, walkable ground with no properties."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._blocking = False # Never blocking by specification
     
     def __str__(self) -> str:
-        return super().__str__(symbol=GROUND_SYMBOL)
+        return GROUND_SYMBOL
     
     def get_tile_name(self) -> str:
         return GROUND_NAME
@@ -858,11 +851,10 @@ class Mountain(Tile):
     """Mountain tiles represent unpassable terrain (always blocking)."""
 
     def __init__(self) -> None:
-        super().__init__()
-        self._blocking = True # Always blocking by specification
+        self._blocking = False # Always blocking by specification 
 
     def __str__(self) -> str:
-        return super().__str__(symbol=MOUNTAIN_SYMBOL)
+        return MOUNTAIN_SYMBOL
     
     def get_tile_name(self) -> str:
         return MOUNTAIN_NAME
@@ -876,57 +868,64 @@ class Building(Tile):
         is_blocking
         is_destroyed
         damage
+
     Additional Attributes:
         _health (int): Building tiles have an integer health value and can be
             destroyed. 
             A building tile is destroyed when its health drops to zero. 
             The health value of a building can never increase above 9.
-            Building tiles are blocking only when they are not destroyed.
+            
+        blocking : Building tiles are blocking only when they are not destroyed.
     """
     def __init__(self, initial_health: int) -> None:
-        super().__init__()
+        # Don't need to super() to init blocking since it's not stored for
+        # buildings (determined by destroyed/not)
         self._health = initial_health # between 0 and 9 (inclusive)
 
     def __repr__(self) -> str:
+        # Overrides default to ensure health is passed as an argument
         return f"Building({self._health})"
 
     def __str__(self) -> str:
+        # Overrides default to pass health not symbol
         return str(self._health)
 
     def get_health(self) -> int:
         return self._health
 
-    def is_blocking(self):
-        """Building tiles are only blocking iff they are not destroyed."""
+    def is_blocking(self) -> bool:
+        # Building tiles are only blocking iff they are not destroyed.
         return not self.is_destroyed()
     
     def is_destroyed(self):
         """Returns True only if a building is destroyed"""
-        return self._health == 0
+        return not self._health # no health remaining
     
     def damage(self, damage: int) -> None:
-        """ Reduces the health of the building by the amount specified.
+        """Reduces the health of the building by the amount specified.
         
         Note that damage is not constrained to be positive. The health of the
         building should be capped to be between 0 and MAX_BUILDING_HEALTH (inc).
         
         This function should do nothing if the building is destroyed.
+
+        Paramaters:
+            damage (int): the amount of damage to be inflicted.
         """
         if self.is_destroyed():
-            return # Do nothing if destroyed.
+            return # Do nothing if destroyed
 
         resulting_health = self._health - damage 
-
-        # Ensure the health value is kept between 0 & MAX_BUILDING_HEALTH inc.
-        if resulting_health > MAX_BUILDING_HEALTH:
-            resulting_health = MAX_BUILDING_HEALTH
+        if resulting_health > MAX_BUILDING_HEALTH: # Ensure the health value is 
+            resulting_health = MAX_BUILDING_HEALTH # kept between 0 & MAX
         elif resulting_health < 0:
             resulting_health = 0
-        self._health = resulting_health
+        self._health = resulting_health # sets the health to new & VALID value
 
     def get_tile_name(self) -> str:
         return BUILDING_NAME 
 
+# ( Board Class )
 class Board(object):
     """Board represents a structured set of tiles. 
     
@@ -1028,8 +1027,9 @@ class Board(object):
                     buildings[(row_num, col_num)] = tile
         return buildings
     
-# --- VIEW ---
 
+# --- VIEW ---
+# ( Main View Class )
 class BreachView(object):
     """The BreachView class provides a single view interface for the controller.
     
@@ -1097,6 +1097,7 @@ class BreachView(object):
             click_callback: Callable[[tuple[int, int]], None]) -> None:
         self._gameGrid.bind_click_callback(click_callback)
         
+# ( Game Frame Classes )
 class GameGrid(AbstractGrid):
     """GameGrid is a view component that displays the game board, with entities 
     overlaid on top.
@@ -1212,6 +1213,7 @@ class SideBar(AbstractGrid):
             # actually annote the row contents onto the sidebar
             self._annotate_row(row, row_num)
 
+# ( Control Bar Class )
 class ControlBar(tk.Frame):
     """ControlBar is a view component that contains three buttons that allow the
     user to perform administration actions.
@@ -1240,8 +1242,6 @@ class ControlBar(tk.Frame):
 
 
 # --- CONTROLLER ---
-
-
 class IntoTheBreach(object):
     """IntoTheBreach is the controller class for the overall game.
     
@@ -1430,9 +1430,7 @@ class IntoTheBreach(object):
 
         self.redraw() # redraw on click if there was changes
   
-
-
-# Main Game Loop
+# <-- End of Object Definitions -->
 
 def play_game(root: tk.Tk, file_path: str) -> None:
     """Plays the given game.
@@ -1451,7 +1449,6 @@ def play_game(root: tk.Tk, file_path: str) -> None:
     """
     gameController = IntoTheBreach(root, file_path) # init contrller from file
     root.mainloop() # start the mainloop for event listening etc
-
     
 def main() -> None:
     """The main function is used for developer testing.
