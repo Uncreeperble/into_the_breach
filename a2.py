@@ -16,6 +16,8 @@ LOSE_TEXT = 'You Lost!'
 
 ENTITY_DEFAULT_FREINDLINESS = False # Entities are not friendly by default
 MECH_DEFAULT_FREIDNLINESS = True # Mech entities ARE friendly however
+ENEMY_FRIENDLINESS = False # Enemies are NEVER friendly. 
+
 TILE_DEFAULT_BLOCKING = False # Tiles are NOT blocking by default
 MECH_DEFAULT_ACTIVITY = True # Mechs are ALWAYS starting as active
 
@@ -409,7 +411,7 @@ class Entity(object):
     entity is destroyed when its health drops to zero. Entities can be friendly
     (that is, under player control), or not
 
-    Attributes:
+    Main Attributes:
         _position (tuple[int, int]): the positioin (row, col) of the entity
             on the board.
         _health (int): the health of the entity- affected on damage/attack,
@@ -418,25 +420,6 @@ class Entity(object):
             a move.
         _strength (int): the amount of damage this entity does to another when
             it attacks (to the other entities health). (Can be negative)
-    
-    Subclasses & Types:
-        Mech: Entities that are controlled by the player.
-            Additional Methods:
-                enable
-                disable
-                is_active.
-            Additional Attributes:
-                _is_active (bool): is the mech active.
-                _previous_position (int): what was the previous mechs position.
-        Enemy: Entities that are controlled by the game, and have their own
-            movment algorithms etc.
-            Additional Methods:
-                get_objective
-                update_objective
-            Additional Attributes:
-                _objective (tuple[int, int]): the position that the entity wants
-                    to move towards.
-
     """
 
     def __init__(self, position: tuple[int, int], initial_health: int,
@@ -584,7 +567,18 @@ class Entity(object):
         entity.damage(self._strength)
 
 class Mech(Entity): 
-    # TODO
+    """Mechs are types of Entities that are controlled by the player.
+
+    Additional Methods:
+        enable
+        disable
+        is_active.
+
+    Additional Attributes:
+        _is_active (bool): is the mech active.
+        _previous_position (int): what was the previous mechs position.
+    """
+
     def __init__(self, position: tuple[int, int], initial_health: int,
                 speed: int, strength: int) -> None:
         super().__init__(position, initial_health, speed, strength)
@@ -613,6 +607,8 @@ class Mech(Entity):
         return self._active
 
 class TankMech(Mech):
+    """Tank Mechs are a child classs of Mechs that targets horizontal tiles."""
+
     def get_targets(self) -> list[tuple[int, int]]:
         # The two sets of five tiles extending in a horizontal line
         # this is achieved by adding the (0, i) for i from -5 (left) to 5 right
@@ -626,6 +622,12 @@ class TankMech(Mech):
         return TANK_NAME
 
 class HealMech(Mech):
+    """Heal Mechs are a child class of Mechs that heal fellow Mechs.
+    
+    Heal Mechs store a positive strength- however on attack will heal the
+    entity (only if its friendly) with this strength.
+    """
+
     def attack(self, entity: "Entity") -> None:
         """Heal Mechs can only 'attack' friendly enemies
         """
@@ -646,7 +648,20 @@ class HealMech(Mech):
         return HEAL_NAME
 
 class Enemy(Entity):
-    # TODO
+    """Enemies are entities that are controlled by the game.
+    
+    They have their own movement / attack strategies- involving objectives.
+    Enemies of any type are not friendly.
+
+    Additional Methods:
+        get_objective
+        update_objective
+        
+    Additional Attributes:
+        _objective (tuple[int, int]): the position that the entity wants
+            to move towards.
+    """
+
     def __init__(self, position: tuple[int, int], initial_health: int,
                  speed: int, strength: int) -> None:
         """All enemies have an objective, which is a position that the entity 
@@ -677,12 +692,15 @@ class Enemy(Entity):
         
     def get_name(self) -> str:
         return ENEMY_NAME
+    
+    def is_friendly(self) -> bool:
+        return ENEMY_FRIENDLINESS
         
 class Scorpion(Enemy):
-    """Scorpion inherits from Enemy. Scorpion represents a type of enemy that 
-    attacks at a moderate range in all directions, and targets mechs with the 
-    highest health.
+    """Scorpion represents a type of enemy that attacks at a moderate range in
+    all directions, and targets mechs with the highest health.
     """
+
     def update_objective(self, entities: list[Entity], 
                          buildings: dict[tuple[int, int], "Building"]) -> None:
         """Position of tile containing mech with the greatest health. If two
@@ -723,6 +741,9 @@ class Scorpion(Enemy):
         return SCORPION_NAME
 
 class Firefly(Enemy):  
+    """Firefly represents a type of enemy that attacks at a long range
+    vertically, and targets buildings with the lowest health
+    """
 
     def update_objective(self, entities: list[Entity], 
                          buildings: dict[tuple[int, int], "Building"]) -> None:
@@ -769,6 +790,13 @@ class Firefly(Enemy):
         return FIREFLY_NAME
 
 class Tile(object):
+    """Tiles are used to represent game objects not entities.
+    
+    Tile is an abstract class from which all instantiated types of tile inherit. 
+    Provides default tile behavior, which can be inherited or overridden by 
+    specific types of tiles.
+    """
+
     def __init__(self) -> None:
         self._blocking = TILE_DEFAULT_BLOCKING
 
@@ -799,6 +827,8 @@ class Tile(object):
         return symbol
 
 class Ground(Tile):
+    """Ground tiles represent simple, walkable ground with no properties."""
+
     def __init__(self) -> None:
         super().__init__()
         self._blocking = False # Never blocking by specification
@@ -810,6 +840,8 @@ class Ground(Tile):
         return GROUND_NAME
 
 class Mountain(Tile):
+    """Mountain tiles represent unpassable terrain (always blocking)."""
+
     def __init__(self) -> None:
         super().__init__()
         self._blocking = True # Always blocking by specification
@@ -821,9 +853,30 @@ class Mountain(Tile):
         return MOUNTAIN_NAME
 
 class Building(Tile):
+    """ Building tiles represent one or more buildings that the player must
+    protect from enemies. 
+    
+    Additional Methods:
+        get_health
+        is_blocking
+        is_destroyed
+        damage
+    Additional Attributes:
+        _health (int): Building tiles have an integer health value and can be
+            destroyed. 
+            A building tile is destroyed when its health drops to zero. 
+            The health value of a building can never increase above 9.
+            Building tiles are blocking only when they are not destroyed.
+    """
     def __init__(self, initial_health: int) -> None:
         super().__init__()
         self._health = initial_health # between 0 and 9 (inclusive)
+
+    def __repr__(self) -> str:
+        return f"Building({self._health})"
+
+    def __str__(self) -> str:
+        return str(self._health)
 
     def get_health(self) -> int:
         return self._health
@@ -855,12 +908,6 @@ class Building(Tile):
         elif resulting_health < 0:
             resulting_health = 0
         self._health = resulting_health
-    
-    def __repr__(self) -> str:
-        return f"Building({self._health})"
-
-    def __str__(self) -> str:
-        return str(self._health)
 
     def get_tile_name(self) -> str:
         return BUILDING_NAME 
@@ -872,6 +919,15 @@ class Board(object):
     associated (row, column) position. (0,0) represents the top-left corner,
     (1,0) represents the position directly below the top-left corner, and (0, 1)
     represents the position directly right of the top left corner. 
+
+    Attributes:
+        _board: the list of objects that create the board.
+
+    Methods:
+        get_board
+        get_dimensions
+        get_tile
+        get_buildings
     """
 
     def __init__(self, board: list[list[str]]) -> None:
@@ -895,6 +951,31 @@ class Board(object):
         described in previous sections.
         """
         self._board = self._generate_initial_board(board)
+
+    def __repr__(self) -> str:
+        board_string = [] # Turning board back into repr 
+        for row in self._board:
+            row_str = [] 
+            for tile in row:
+                row_str.append("'" + str(tile) + "'") # adds "T" tile in quotes.
+            board_string.append('[' + ', '.join(row_str) + ']') # adds list
+
+        return f"Board([{', '.join(board_string)}])"
+    
+    def __str__(self) -> str:
+        """Returns a string representation of the board.
+        
+        This is the string formed by concatenating the characters representing
+        each tile of a row in the order they appear (left to right), and then
+        concatenating each row in order (from top to bottom), separating each
+        row with a new line character."""
+        output = [] # used to store the resulting string as a character array.
+        for row in self._board:
+            row_str = []
+            for tile in row:
+                row_str.append(str(tile))
+            output.append(''.join(row_str))
+        return '\n'.join(output)
 
     def get_board(self) -> list[list[object]]:
         return self._board
@@ -932,34 +1013,29 @@ class Board(object):
                     buildings[(row_num, col_num)] = tile
         return buildings
     
-    def __repr__(self) -> str:
-        board_string = [] # Turning board back into repr 
-        for row in self._board:
-            row_str = [] 
-            for tile in row:
-                row_str.append("'" + str(tile) + "'") # adds "T" tile in quotes.
-            board_string.append('[' + ', '.join(row_str) + ']') # adds list
-
-        return f"Board([{', '.join(board_string)}])"
-    
-    def __str__(self) -> str:
-        """Returns a string representation of the board.
-        
-        This is the string formed by concatenating the characters representing
-        each tile of a row in the order they appear (left to right), and then
-        concatenating each row in order (from top to bottom), separating each
-        row with a new line character."""
-        output = [] # used to store the resulting string as a character array.
-        for row in self._board:
-            row_str = []
-            for tile in row:
-                row_str.append(str(tile))
-            output.append(''.join(row_str))
-        return '\n'.join(output)
- 
 # --- VIEW ---
 
 class BreachView(object):
+    """The BreachView class provides a single view interface for the controller.
+    
+    The view is laid out such that there is a banner at the top of the window,
+    with the GameGrid and SideBar appearing horizontally adjacent just below it.
+    The ControlBar should appear below these two components.
+
+    Attributes:
+        _root: the tk root the viewer runs on
+        _baner: the tk label for the banner 
+        _gameFrame: the main tkFrame holding the grid and sidebar
+        _gameGrid: the GameGrid of the view
+        _sideBar: the SideBar of the viewer
+        _controlBar: the ControlBar of the viewer
+    
+    Methods:
+        get_grid
+        redraw
+        bind_click_callback
+    """
+
     def __init__(self, root: tk.Tk, board_dims: tuple[int, int],
                  save_callback: Optional[Callable[[], None]] = None,
                  load_callback: Optional[Callable[[], None]] = None,
@@ -1007,6 +1083,19 @@ class BreachView(object):
         self._gameGrid.bind_click_callback(click_callback)
         
 class GameGrid(AbstractGrid):
+    """GameGrid is a view component that displays the game board, with entities 
+    overlaid on top.
+    
+    Tiles are represented by certain colored  squares, and entities are
+    displayed by annotating special Unicode symbols on top of these squares
+
+    Methods:
+        redraw
+        bind_click_callback
+    
+    Note that GameGrid inherits the predefined AbstractGrid and its properties.
+    """
+
     def redraw(self, board: 'Board', entities: list['Entity'],
                highlighted: list[tuple[int, int]] = None,
                movement: bool = False) -> None:
@@ -1062,6 +1151,18 @@ class GameGrid(AbstractGrid):
         self.bind("<Button 2>", click_callback)
     
 class SideBar(AbstractGrid): 
+    """SideBar is a view component that displays properties of each entity. 
+    
+    Entities appear in descending priority order, with the highest priority
+    entity appearing at the top of the sidebar, and the lowest priority entity
+    appearing at the bottom of the sidebar.
+
+    Methods:
+        display
+
+    Note that SideBar inherits the predefined AbstractGrid and its properties.
+    """
+
     def _annotate_row(self, row: list[str], row_num, font=SIDEBAR_FONT):
         for col_num, col_text in enumerate(row):
             self.annotate_position((row_num, col_num), col_text, font)
@@ -1097,6 +1198,13 @@ class SideBar(AbstractGrid):
             self._annotate_row(row, row_num)
 
 class ControlBar(tk.Frame):
+    """ControlBar is a view component that contains three buttons that allow the
+    user to perform administration actions.
+    
+    In order from left to right, the ControlBar contains the buttons:
+        - save, load, and end turn
+    """
+
     def __init__(self, master: tk.Widget,
                  save_callback: Optional[Callable[[], None]] = None,
                  load_callback: Optional[Callable[[], None]] = None,
@@ -1120,6 +1228,27 @@ class ControlBar(tk.Frame):
 
 
 class IntoTheBreach(object):
+    """IntoTheBreach is the controller class for the overall game.
+    
+    The controller is responsible for creating and maintaining instances of the
+    model and view classes, event handling, and facilitating communication
+    between the model and view classes. 
+    
+    The controller will track which entity occupied the tile last clicked on by
+    the user in order to correctly highlight tiles on the board.
+    
+    Attributes:
+        _root: the main tk.Tk root
+        _highlighted_entity: the last clicked entity (highlighted)
+        _viewer: The BreachView object
+        _model: The BreachModel object
+        
+    Methods:
+        redraw
+        set_focussed_entity
+        make_move
+        load_model
+        """
     def __init__(self, root: tk.Tk, game_file: str) -> None:
         self._root = root
 
@@ -1142,7 +1271,7 @@ class IntoTheBreach(object):
         self.redraw() # Initial render
 
     def restart(self):
-        # Loads model and viewer again
+        # Loads model and viewer again # TODO PRIVATE
         self.load_model(self._game_file)
         # recreate the viewer to new model etc
         self._reset_viewer()
@@ -1290,16 +1419,32 @@ class IntoTheBreach(object):
 
 # Main Game Loop
 
-def play_game(root, file_path) -> None:
-    c = IntoTheBreach(root, file_path)
-    root.mainloop()
+def play_game(root: tk.Tk, file_path: str) -> None:
+    """Plays the given game.
+    
+    Constructs the controller instance using the given file path and the root
+    tk.Tk parameter.
+    
+    Ensures the root window stays opening listening for events (using mainloop).
+    
+    Paramaters:
+        root (tk.Tk): the root object to run the game with
+        file_path (str): the file path to the games first level file
+        
+    Preconditions:
+        the initial file_path has to be valid.
+    """
+    gameController = IntoTheBreach(root, file_path) # init contrller from file
+    root.mainloop() # start the mainloop for event listening etc
 
     
 def main() -> None:
-    """The main function
+    """The main function is used for developer testing.
+
+    It calls play game for any custom conditions of root and file_path.
     """
     root = tk.Tk()
     play_game(root, './levels/level3.txt')
 
 if __name__ == "__main__":
-    main()
+    main() # allows file to work as standalone script (for testing etc.s)
