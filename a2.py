@@ -851,7 +851,7 @@ class Mountain(Tile):
     """Mountain tiles represent unpassable terrain (always blocking)."""
 
     def __init__(self) -> None:
-        self._blocking = False # Always blocking by specification 
+        self._blocking = True # Always blocking by specification 
 
     def __str__(self) -> str:
         return MOUNTAIN_SYMBOL
