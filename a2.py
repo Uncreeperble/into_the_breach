@@ -144,11 +144,10 @@ class BreachModel(object):
                 # is blocking (dist = -1) or if we are not including the 
                 # start but the pos equals the start
                 continue
-            if not closest_pos or curr_dist < least_dist:
-                # If we havn't found a valid point yet or we found a point
-                # that was closer- set this to the new closest
-                closest_pos, least_dist = pos, curr_dist
-        # Ensure we return a valid position (start) if no points were found
+            if not closest_pos or curr_dist <= least_dist:
+                # If we havn't found a valid point or we found a point closer
+                # or same dist & higher priority- set this to the new closest
+                closest_pos, least_dist = pos, curr_distss
         return closest_pos
 
     def get_board(self) -> 'Board':
@@ -326,17 +325,15 @@ class BreachModel(object):
         for enemy in self._get_enemies():
             objective, enemy_pos = enemy.get_objective(), enemy.get_position()
 
-            if self._board.get_tile(objective).is_blocking():
-                # If the objective is blocking (which it always will be for the
-                # current impementation of the game)
-                # Then find the closest adjacent point to the objective, and try
-                # to get to this point.
-                objective = self._closest_position(
-                    map(lambda p : add_positions(objective, p),
-                        [DOWN, RIGHT, LEFT, UP]), # list of adjacent positions
-                    enemy_pos,
-                    None, # Don't use a set objective, use the given positions
-                    include_start = False) # We shouldn't consider enemy_pos
+            # Since the objective is always going to be blocking in the current
+            # game implmentation (either a building / entity) search for the 
+            # closest adjacent tile to this original objective and make this it.
+            objective = self._closest_position(
+                map(lambda p : add_positions(objective, p),
+                    [UP, LEFT, RIGHT, DOWN]), # list of adjacent positions
+                enemy_pos,
+                None, # Don't use a set objective, use the given positions
+                include_start = False) # We shouldn't consider enemy_pos
             if not objective:
                 continue # This enemies objective was surrounded/unreachable
 
