@@ -758,7 +758,7 @@ class Firefly(Enemy):
         extending upwards, and beginning from the tile directly below the 
         firefly and extending downwards respectively.
         """ 
-        return [add_positions(self._position, pos) # get actual coords
+        return [add_positions(self._position, dir) # get actual coords
                 for dir in # relative coordinates from 5 down to 5 up (not 0)
                     [(i, 0) for i in range(-5, 6) if i !=  0]]
 
