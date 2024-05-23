@@ -741,8 +741,8 @@ class Scorpion(Enemy):
 
         # the tiles n units away in each direction (ie extending 2 left etc.)
         relative_tiles = [scale_position(dir, dist+1) # extend distance
-                          for dir in [LEFT, RIGHT, UP, DOWN] # cardinal directns
-                          for dist in range(TANK_DIS)] # 0, 1.. TANK_DIS-1
+                          for dist in range(TANK_DIS) # 0, 1.. TANK_DIS-1
+                          for dir in [LEFT, RIGHT, UP, DOWN]] # cardinal dirs
         # return the positions using their relative tiles
         return [add_positions(self._position, pos) for pos in relative_tiles]
 
