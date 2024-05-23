@@ -22,6 +22,7 @@ TILE_DEFAULT_BLOCKING = False # Tiles are NOT blocking by default
 MECH_DEFAULT_ACTIVITY = True # Mechs are ALWAYS starting as active
 
 TANK_DIS = 5 # The distance tech Mechs can target horizontally
+SCORP_DIS = 2
 
 
 UP, DOWN, LEFT, RIGHT = PLUS_OFFSETS[::-1] # 2D-Direction vectors
@@ -741,7 +742,7 @@ class Scorpion(Enemy):
 
         # the tiles n units away in each direction (ie extending 2 left etc.)
         relative_tiles = [scale_position(dir, dist+1) # extend distance
-                          for dist in range(TANK_DIS) # 0, 1.. TANK_DIS-1
+                          for dist in range(SCORP_DIS) # 0, 1.. SCORP_DIS-1
                           for dir in [LEFT, RIGHT, UP, DOWN]] # cardinal dirs
         # return the positions using their relative tiles
         print(self)
