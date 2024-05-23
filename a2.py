@@ -135,6 +135,7 @@ class BreachModel(object):
         return filter(lambda e: not e.is_friendly(), self.get_entities())
 
     def _closest_position(self, positions, goal, exclude_goal = False):
+        """TODO : REEMEBER DECENDING ORDER"""
         closest_pos, least_dist = None, None
         for pos in positions:
             if pos == goal and exclude_goal:
@@ -322,6 +323,7 @@ class BreachModel(object):
         Enemies move in descending priority order starting with the highest
         priority enemy.
         """
+        # TODO
         for enemy in self._get_enemies():
             objective = enemy.get_objective()
 
