@@ -744,6 +744,8 @@ class Scorpion(Enemy):
                           for dist in range(TANK_DIS) # 0, 1.. TANK_DIS-1
                           for dir in [LEFT, RIGHT, UP, DOWN]] # cardinal dirs
         # return the positions using their relative tiles
+        print(self)
+        print(relative_tiles)
         return [add_positions(self._position, pos) for pos in relative_tiles]
 
     def get_symbol(self) -> str:
