@@ -713,7 +713,7 @@ class Scorpion(Enemy):
         # the tiles 2 units away in each direction
         extended_directions = [scale_position(dir, 2) for dir in directions]
         # calculate each of these positions not relative to current positions
-        return [add_positions(self._position, dir)
+        return [add_positions(self._position, direction)
                 for direction in directions + extended_directions]
 
     def get_symbol(self) -> str:
