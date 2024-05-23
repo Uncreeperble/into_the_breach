@@ -134,11 +134,10 @@ class BreachModel(object):
         # get_entities already filters out dead entities, this filters mechs out
         return filter(lambda e: not e.is_friendly(), self.get_entities())
 
-    def _closest_position(self, positions, start, end, include_start=True):
+    def _closest_position(self, positions, goal, include_start=True):
         closest_pos, least_dist = None, None
         for pos in positions:
-            goal = end if end else pos # if no end was included use curr pos.s
-            curr_dist = get_distance(self, start, goal)
+            curr_dist = get_distance(self, goal, pos)
             if curr_dist == -1 or (not include_start and pos == start):
                 # We don't consider this point if either the end point 
                 # is blocking (dist = -1) or if we are not including the 
@@ -324,7 +323,7 @@ class BreachModel(object):
         priority enemy.
         """
         for enemy in self._get_enemies():
-            objective, enemy_pos = enemy.get_objective(), enemy.get_position()
+            objective = enemy.get_objective()
 
             # Since the objective is always going to be blocking in the current
             # game implmentation (either a building / entity) search for the 
@@ -332,15 +331,14 @@ class BreachModel(object):
             objective = self._closest_position(
                 map(lambda p : add_positions(objective, p),
                     [UP, LEFT, RIGHT, DOWN]), # list of adjacent positions
-                enemy_pos,
-                None, # Don't use a set objective, use the given positions
+                enemy.get_position(),
                 include_start = False) # We shouldn't consider enemy_pos
             if not objective:
                 continue # This enemies objective was surrounded/unreachable
 
             # Gets the closest valid position to the objective (including curnt)
             closest_to_objective = self._closest_position(
-                self.get_valid_movement_positions(enemy), enemy_pos, objective)
+                self.get_valid_movement_positions(enemy), objectives)
 
             # move the enemy to the closest position to the objective
             enemy.set_position(closest_to_objective)
