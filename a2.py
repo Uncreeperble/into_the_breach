@@ -134,7 +134,7 @@ class BreachModel(object):
         # get_entities already filters out dead entities, this filters mechs out
         return filter(lambda e: not e.is_friendly(), self.get_entities())
 
-    def _closest_position(self, positions, goal, exclude_goal = True):
+    def _closest_position(self, positions, goal, exclude_goal = False):
         closest_pos, least_dist = None, None
         for pos in positions:
             if pos == goal and exclude_goal:
@@ -337,7 +337,7 @@ class BreachModel(object):
 
             # Gets the closest valid position to the objective (including curnt)
             closest_to_objective = self._closest_position(
-                self.get_valid_movement_positions(enemy), objectives)
+                self.get_valid_movement_positions(enemy), objective)
 
             # move the enemy to the closest position to the objective
             enemy.set_position(closest_to_objective)
