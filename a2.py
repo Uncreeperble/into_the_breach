@@ -979,13 +979,8 @@ class Board(object):
         each tile of a row in the order they appear (left to right), and then
         concatenating each row in order (from top to bottom), separating each
         row with a new line character."""
-        output = [] # used to store the resulting string as a character array.
-        for row in self._board:
-            row_str = []
-            for tile in row:
-                row_str.append(str(tile))
-            output.append(''.join(row_str))
-        return '\n'.join(output)
+        return '\n'.join([''.join([str(tile) for tile in row]) # Row of str-tile
+                         for row in self._board]) # Each row split by newling
 
     def _generate_initial_board(self, input_board: list[list[str]]):
         board = []
