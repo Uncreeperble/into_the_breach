@@ -134,14 +134,14 @@ class BreachModel(object):
         # get_entities already filters out dead entities, this filters mechs out
         return filter(lambda e: not e.is_friendly(), self.get_entities())
 
-    def _closest_position(self, positions, goal, include_start=True):
+    def _closest_position(self, positions, goal, exclude_goal = True):
         closest_pos, least_dist = None, None
         for pos in positions:
+            if pos == goal and exclude_goal:
+                continue
             curr_dist = get_distance(self, goal, pos)
-            if curr_dist == -1 or (not include_start and pos == start):
-                # We don't consider this point if either the end point 
-                # is blocking (dist = -1) or if we are not including the 
-                # start but the pos equals the start
+            if curr_dist == -1:
+                # We don't consider this point if the end point is blocked
                 continue
             if not closest_pos or curr_dist <= least_dist:
                 # TODO
@@ -331,8 +331,7 @@ class BreachModel(object):
             objective = self._closest_position(
                 map(lambda p : add_positions(objective, p),
                     [UP, LEFT, RIGHT, DOWN]), # list of adjacent positions
-                enemy.get_position(),
-                include_start = False) # We shouldn't consider enemy_pos
+                enemy.get_position(), True) # We shouldn't consider enemy_pos
             if not objective:
                 continue # This enemies objective was surrounded/unreachable
 
