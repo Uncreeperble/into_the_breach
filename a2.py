@@ -139,15 +139,16 @@ class BreachModel(object):
         for pos in positions:
             goal = end if end else pos # if no end was included use curr pos.s
             curr_dist = get_distance(self, start, goal)
-            if curr_dist == -1 or (not include_start and not pos == start):
+            if curr_dist == -1 or (not include_start and pos == start):
                 # We don't consider this point if either the end point 
                 # is blocking (dist = -1) or if we are not including the 
                 # start but the pos equals the start
                 continue
-            if not closest_pos or curr_dist <= least_dist:
+            if not closest_pos or curr_dist < least_dist:
+                # TODO
                 # If we havn't found a valid point or we found a point closer
                 # or same dist & higher priority- set this to the new closest
-                closest_pos, least_dist = pos, curr_distss
+                closest_pos, least_dist = pos, curr_dist
         return closest_pos
 
     def get_board(self) -> 'Board':
